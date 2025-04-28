@@ -10,9 +10,11 @@ from datetime import datetime
 import sys
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 from models import models
+from sklearn.metrics import mean_squared_error, mean_absolute_error
 
 start_date = datetime(2023, 10, 1).strftime('%Y-%m-%d')
 end_date = datetime(2024, 10, 1).strftime('%Y-%m-%d')
+forcast_date = datetime(2025, 2, 1).strftime('%Y-%m-%d')
 
 st.title ("Predicting and forecasting")
 select_crypto = st.selectbox(
@@ -32,6 +34,7 @@ elif select_forcast == '30 days':
     select_forcast = 30
 if select_model == 'ARIMA': 
     df = yf.download(select_crypto, start=start_date, end=end_date)
+    forecast_original = yf.download(select_crypto, start=end_date, end=forcast_date)['Close']
     in_sample_preds , forecast = models.run_arima(df,steps=select_forcast)
     last_actual_value = pd.Series([df['Close'].iloc[-1][select_crypto]], index=[df.index[-1]])
     concat = pd.concat([ in_sample_preds , forecast])
@@ -60,9 +63,19 @@ if select_model == 'ARIMA':
         elif selected_signal == 'Sell Signal':
             st.write(f'Sell Signal Price: {combined['Forecast'].max():.3f}')
             st.write('Sell Signal Date:' , combined['Forecast'].idxmax().strftime('%Y-%m-%d'))
-        
+
+    #model evaluation
+    st.subheader("Model Evaluation")
+    st.write("In-sample predictions:")
+    st.write(f"Mean Absolute Error: {mean_absolute_error(original.loc[in_sample_preds.index], in_sample_preds):.3f}")
+    st.write(f"Mean Squared Error: {mean_squared_error(original.loc[in_sample_preds.index], in_sample_preds):.3f}")
+    st.write("Forecast:")
+    st.write(f"Mean Absolute Error: {mean_absolute_error(forecast_original.loc[forecast.index], forecast):.3f}")
+    st.write(f"Mean Squared Error: {mean_squared_error(forecast_original.loc[forecast.index], forecast):.3f}")
+
 elif select_model == 'XGBoost':
     df = yf.download(select_crypto, start=start_date, end=end_date)
+    forecast_original = yf.download(select_crypto, start=end_date, end=forcast_date)['Close']
     in_sample_preds , forecast = models.run_xgboost(df,steps=select_forcast)
     last_actual_value = pd.Series([df['Close'].iloc[-1][select_crypto]], index=[df.index[-1]])
     forecast_ = forecast.iloc[:, 0]
@@ -90,8 +103,19 @@ elif select_model == 'XGBoost':
         elif selected_signal == 'Sell Signal':
             st.write(f'Sell Signal Price: {combined['Forecast'].max():.3f}')
             st.write('Sell Signal Date:' , combined['Forecast'].idxmax().strftime('%Y-%m-%d'))
+
+    #model evaluation
+    st.subheader("Model Evaluation")
+    st.write("In-sample predictions:")
+    st.write(f"Mean Absolute Error: {mean_absolute_error(original.loc[in_sample_preds.index], in_sample_preds):.3f}")
+    st.write(f"Mean Squared Error: {mean_squared_error(original.loc[in_sample_preds.index], in_sample_preds):.3f}")
+    st.write("Forecast:")
+    st.write(f"Mean Absolute Error: {mean_absolute_error(forecast_original.loc[forecast.index], forecast):.3f}")
+    st.write(f"Mean Squared Error: {mean_squared_error(forecast_original.loc[forecast.index], forecast):.3f}")
+
 elif select_model == 'LSTM':
     df = yf.download(select_crypto, start=start_date, end=end_date)
+    forecast_original = yf.download(select_crypto, start=end_date, end=forcast_date)['Close']
     file_path = os.path.dirname(os.path.abspath(__file__))
     model_path = file_path + f"\models\{select_crypto}_{select_forcast}.keras" 
     in_sample_preds , forecast = models.run_lstm(df,model_path,steps=select_forcast)
@@ -122,8 +146,20 @@ elif select_model == 'LSTM':
         elif selected_signal == 'Sell Signal':
             st.write(f'Sell Signal Price: {combined['Forecast'].max():.3f}')
             st.write('Sell Signal Date:' , combined['Forecast'].idxmax().strftime('%Y-%m-%d'))
+        
+    #model evaluation
+    st.subheader("Model Evaluation")
+    st.write("In-sample predictions:")
+    st.write(f"Mean Absolute Error: {mean_absolute_error(original.loc[in_sample_preds.index], in_sample_preds):.3f}")
+    st.write(f"Mean Squared Error: {mean_squared_error(original.loc[in_sample_preds.index], in_sample_preds):.3f}")
+    st.write("Forecast:")
+    st.write(f"Mean Absolute Error: {mean_absolute_error(forecast_original.loc[forecast.index], forecast):.3f}")
+    st.write(f"Mean Squared Error: {mean_squared_error(forecast_original.loc[forecast.index], forecast):.3f}")
+
 elif select_model == 'Prophet':
     df = yf.download(select_crypto, start=start_date, end=end_date)
+    df_copy = df.copy()
+    forecast_original = yf.download(select_crypto, start=end_date, end=forcast_date)['Close']
     df.columns = df.columns.get_level_values(0)
     forecast , fig = models.run_prophet(df,steps=select_forcast)
     st.pyplot(fig)
@@ -142,9 +178,21 @@ elif select_model == 'Prophet':
         elif selected_signal == 'Sell Signal':
             st.write(f'Sell Signal Price: {forecast['Forecast'].max():.3f}')
             st.write('Sell Signal Date:' , forecast['Forecast'].idxmax().strftime('%Y-%m-%d'))
+    df_concat = pd.concat([df_copy['Close'], forecast_original], axis=0)
+    #model evaluation
+    st.subheader("Model Evaluation")
+    st.write("In-sample predictions:")
+    st.write(f"Mean Absolute Error: {mean_absolute_error(df_copy['Close'], forecast['Forecast'].loc[df_copy.index]):.3f}")
+    st.write(f"Mean Squared Error: {mean_squared_error(df_copy['Close'], forecast['Forecast'].loc[df_copy.index]):.3f}")
+    st.write("Forecast:")
+    st.write(f"Mean Absolute Error: {mean_absolute_error(forecast_original[-select_forcast:], 
+                                                         forecast['Forecast'][-select_forcast:]):.3f}")
+    st.write(f"Mean Squared Error: {mean_squared_error(forecast_original[-select_forcast:],
+                                                         forecast['Forecast'][-select_forcast:]):.3f}")
 
 
 # Display similar cryptocurrencies
+st.subheader("Similar Cryptocurrencies")
 file_path = os.path.dirname(os.path.abspath(__file__))
 df_similar= pd.read_csv(f'{file_path}\df_clusters.csv')
 similar = df_similar.Cluster[df_similar['Crypto']== select_crypto]

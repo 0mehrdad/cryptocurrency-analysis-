@@ -14,11 +14,13 @@ from darts.utils.timeseries_generation import datetime_attribute_timeseries
 from darts.metrics import mape
 from darts.dataprocessing.transformers import Scaler
 from darts.models import TransformerModel
+from sklearn.metrics import mean_squared_error, mean_absolute_error
 
 start_date = datetime(2023, 10, 1).strftime('%Y-%m-%d')
 end_date = datetime(2024, 10, 1).strftime('%Y-%m-%d')
+forcast_date = datetime(2025, 2, 1).strftime('%Y-%m-%d')
 
-st.title ("Predicting and forecasting with N-BEATS and Transformers")
+st.title("N-BEATS and Transformers")
 select_crypto = st.selectbox(
     "Select the cryptocurrency you want to predict",
       ("ZEC-USD", "XMR-USD", "LTC-USD", "AXS-USD"))
@@ -29,6 +31,7 @@ select_forcast = st.slider(
     'Select the number of days to forecast',1, 100,7)
 if select_model == 'N-BEATS':
     df = yf.download(select_crypto, start=start_date, end=end_date)
+    forecast_original = yf.download(select_crypto, start=end_date, end=forcast_date)['Close']
     file_path = os.path.dirname(os.path.abspath(__file__))
     model_path = file_path + f"\models_extra\{select_model}_{select_crypto}"
     model = NBEATSModel.load(model_path)
@@ -65,10 +68,20 @@ if select_model == 'N-BEATS':
         elif selected_signal == 'Sell Signal':
             st.write(f'Sell Signal Price: {target['Forecast'].max():.3f}')
             st.write('Sell Signal Date:' , target['Forecast'].idxmax().strftime('%Y-%m-%d'))
+    
+    #model evaluation
+    st.subheader("Model Evaluation")
+    st.write("In-sample predictions:")
+    st.write(f"Mean Absolute Error: {mean_absolute_error(df[-74:]['Close'], forecast['Forecast'][:74]):.3f}")
+    st.write(f"Mean Squared Error: {mean_squared_error(df[-74:]['Close'], forecast['Forecast'][:74]):.3f}")
+    st.write("Forecast:")
+    st.write(f"Mean Absolute Error: {mean_absolute_error(forecast_original.loc[forecast[75:].index], forecast['Forecast'][75:]):.3f}")
+    st.write(f"Mean Squared Error: {mean_squared_error(forecast_original.loc[forecast[75:].index], forecast['Forecast'][75:]):.3f}")
 
 
 if select_model == 'Transformer':
     df = yf.download(select_crypto, start=start_date, end=end_date)
+    forecast_original = yf.download(select_crypto, start=end_date, end=forcast_date)['Close']
     file_path = os.path.dirname(os.path.abspath(__file__))
     model_path = file_path + f"\models_extra\{select_model}_{select_crypto}"
     model = TransformerModel.load(model_path)
@@ -110,7 +123,17 @@ if select_model == 'Transformer':
         elif selected_signal == 'Sell Signal':
             st.write(f'Sell Signal Price: {target['Forecast'].max():.3f}')
             st.write('Sell Signal Date:' , target['Forecast'].idxmax().strftime('%Y-%m-%d'))
+    #model evaluation
+    st.subheader("Model Evaluation")
+    st.write("In-sample predictions:")
+    st.write(f"Mean Absolute Error: {mean_absolute_error(df[-74:]['Close'], forecast['Forecast'][:74]):.3f}")
+    st.write(f"Mean Squared Error: {mean_squared_error(df[-74:]['Close'], forecast['Forecast'][:74]):.3f}")
+    st.write("Forecast:")
+    st.write(f"Mean Absolute Error: {mean_absolute_error(forecast_original.loc[forecast[75:].index], forecast['Forecast'][75:]):.3f}")
+    st.write(f"Mean Squared Error: {mean_squared_error(forecast_original.loc[forecast[75:].index], forecast['Forecast'][75:]):.3f}")
 
+
+st.subheader("Similar Cryptocurrencies")
 file_path = os.path.dirname(os.path.abspath(__file__))
 df_similar= pd.read_csv(f'{file_path}\df_clusters.csv')
 similar = df_similar.Cluster[df_similar['Crypto']== select_crypto]
